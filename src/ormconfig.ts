@@ -1,5 +1,7 @@
 import { ConnectionOptions } from 'typeorm';
 
+console.log('@@@ POSTGRES_HOST', process.env.POSTGRES_HOST);
+
 const config: ConnectionOptions = {
   type: 'postgres',
   host: 'localhost',
