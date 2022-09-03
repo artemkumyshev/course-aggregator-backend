@@ -1,62 +1,54 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Put,
-  UseGuards,
-  UsePipes,
-  ValidationPipe,
-} from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+import { Roles } from 'src/auth/roles-auth.decorator';
+import { UserEntity } from 'src/user/entities/user.entity';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { LoginUserDto } from './dto/login-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from './decorators/user.decorator';
-import { AuthGuard } from './guards/auth.guard';
-import { UserEntity } from './entities/user.entity';
-import { IUserResponse } from './types/userResponse.interface';
+import { AddRoleDto } from './dto/add-role.dto';
+import { BanUserDto } from './dto/ban-user.dto';
 
-@Controller()
+@ApiTags()
+@Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post('auth/sign-up')
-  @UsePipes(new ValidationPipe())
-  async createUser(
-    @Body('user') createUserDto: CreateUserDto,
-  ): Promise<IUserResponse> {
-    const user = await this.userService.createUser(createUserDto);
-    return this.userService.buildUserResponse(user);
+  @ApiOperation({ summary: 'Создание пользователя' })
+  @ApiResponse({ status: 200, type: UserEntity })
+  @Post('/create')
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.userService.createUser(createUserDto);
   }
 
-  @Post('auth/sign-in')
-  @UsePipes(new ValidationPipe())
-  async login(
-    @Body('user') loginUserDto: LoginUserDto,
-  ): Promise<IUserResponse> {
-    const user = await this.userService.login(loginUserDto);
-    return this.userService.buildUserResponse(user);
+  @ApiOperation({ summary: 'Получить всех пользвателей' })
+  @ApiResponse({ status: 200, type: [UserEntity] })
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  @Get()
+  getAllUsers() {
+    return this.userService.getAllUsers();
   }
 
-  @Get('user')
-  @UseGuards(AuthGuard)
-  async currentUser(@User() user: UserEntity): Promise<IUserResponse> {
-    return this.userService.buildUserResponse(user);
+  @ApiOperation({ summary: 'Вадать роль' })
+  @ApiResponse({ status: 200 })
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  @Get('/role')
+  addRole(@Body() dto: AddRoleDto) {
+    return this.userService.addRole(dto);
   }
 
-  @Put('user')
-  @UseGuards(AuthGuard)
-  async updateCurrentUser(
-    @User('id') currentUserId: number,
-    @Body('user') updateUserDto: UpdateUserDto,
-  ): Promise<IUserResponse> {
-    const user = await this.userService.updateUser(
-      currentUserId,
-      updateUserDto,
-    );
-
-    return this.userService.buildUserResponse(user);
+  @ApiOperation({ summary: 'Забанить пользователя' })
+  @ApiResponse({ status: 200 })
+  @UseGuards(JwtAuthGuard)
+  @Roles('ADMIN')
+  @UseGuards(RolesGuard)
+  @Get('/ban')
+  ban(@Body() dto: BanUserDto) {
+    return this.userService.ban(dto);
   }
 }

@@ -1,105 +1,87 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { sign } from 'jsonwebtoken';
-import { compare } from 'bcrypt';
 
-import { JWT_SECRET } from 'src/config';
-import { IUserResponse } from './types/userResponse.interface';
-
-import { UserEntity } from './entities/user.entity';
+import { UserEntity } from 'src/user/entities/user.entity';
+import { RoleService } from 'src/role/role.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { LoginUserDto } from './dto/login-user.dto';
+import { BanUserDto } from './dto/ban-user.dto';
+import { AddRoleDto } from './dto/add-role.dto';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+    private readonly roleService: RoleService,
   ) {}
 
-  async createUser(createUserDto: CreateUserDto) {
-    const userByEmail = await this.userRepository.findOne({
-      email: createUserDto.email,
-    });
+  async createUser({ email, password }: CreateUserDto) {
+    const findRole = await this.roleService.getRoleByValue('USER');
 
-    if (userByEmail) {
-      throw new HttpException(
-        'Email are taken',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
+    const user = new UserEntity();
+    user.email = email;
+    user.password = password;
+    if (findRole) {
+      user.roles = [
+        {
+          id: findRole.id,
+          name: findRole.name,
+          description: findRole.description,
+        },
+      ];
     }
 
-    const newUser = new UserEntity();
-    Object.assign(newUser, createUserDto);
-    return await this.userRepository.save(newUser);
+    return this.userRepository.save(user);
   }
 
-  async login(loginUserDto: LoginUserDto): Promise<UserEntity> {
-    const user = await this.userRepository.findOne(
-      {
-        email: loginUserDto.email,
-      },
-      { select: ['id', 'email', 'firstName', 'lastName', 'login', 'password'] },
-    );
+  async getAllUsers() {
+    const users = await this.userRepository.find();
 
-    if (!user) {
-      throw new HttpException(
-        'Credential are not valid',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
-    }
+    return users;
+  }
 
-    const isPasswordCorrect = await compare(
-      loginUserDto.password,
-      user.password,
-    );
-
-    if (!isPasswordCorrect) {
-      throw new HttpException(
-        'Credential are not valid',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
-    }
-
-    delete user.password;
+  async getUserByEmail(email: string) {
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
 
     return user;
   }
 
-  findById(id: number): Promise<UserEntity> {
-    return this.userRepository.findOne(id);
-  }
+  async addRole(dto: AddRoleDto) {
+    const user = await this.userRepository.findOne({
+      where: { id: dto.userId },
+    });
+    const role = await this.roleService.getRoleByValue(dto.value);
 
-  async updateUser(
-    userId: number,
-    updateUserDto: UpdateUserDto,
-  ): Promise<UserEntity> {
-    const user = await this.findById(userId);
-    Object.assign(user, updateUserDto);
-    return await this.userRepository.save(user);
-  }
+    if (role && user) {
+      await this.userRepository.save({
+        ...user,
+        roles: [
+          ...user.roles,
+          { id: role.id, name: role.name, description: role.description },
+        ],
+      });
 
-  generateJwt(user: UserEntity): string {
-    return sign(
-      {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        login: user.login,
-        email: user.email,
-      },
-      JWT_SECRET,
+      return dto;
+    }
+
+    throw new HttpException(
+      'Пользователь или роль не найдена',
+      HttpStatus.NOT_FOUND,
     );
   }
 
-  buildUserResponse(user: UserEntity): IUserResponse {
-    return {
-      user: {
-        ...user,
-        token: this.generateJwt(user),
-      },
-    };
+  async ban(dto: BanUserDto) {
+    const user = await this.userRepository.findOne({
+      where: { id: dto.userId },
+    });
+    user.isBanned = true;
+    user.banReason = dto.banReason;
+
+    await this.userRepository.save(user);
+
+    return user;
   }
 }
