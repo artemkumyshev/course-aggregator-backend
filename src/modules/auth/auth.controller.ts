@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiExtraModels, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 
 import {
   BadRequestResponse,
@@ -20,10 +20,13 @@ import {
   UnauthorizedResponse,
 } from 'src/shared/decorators';
 import { GenericResponse } from 'src/shared/dto/generic-response.dto';
+import { Auth } from './decorator/auth.decorator';
+import { GetUser } from './decorator/get-user.decorator';
 
 import { SignInAuthDto } from './dto/signin-auth.dto';
 import { SignUpAuthDto } from './dto/signup-auth.dto';
 import { UserEntity } from './entities/user.entity';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { AuthService } from './services/auth.service';
@@ -78,19 +81,16 @@ export class AuthController {
 
   @Operation('Выход из системы')
   @OkResponse(UserEntity)
-  @UseGuards(JwtRefreshGuard)
+  @UseGuards(JwtAuthGuard)
   @Post('signout')
   async signOut(
-    @Req() request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<void> {
-    const { accessOption, refreshOption } =
-      this.authService.getCookiesForLogOut();
-
-    await this.userService.removeRefreshToken(request.user.id);
-
-    response.cookie('Authentication', '', accessOption);
-    response.cookie('Refresh', '', refreshOption);
+    @GetUser() { id }: Pick<UserEntity, 'id'>,
+  ): Promise<GenericResponse<string>> {
+    await this.authService.signOut(id);
+    response.clearCookie('Authentication');
+    response.clearCookie('Refresh');
+    return new GenericResponse('Успешный выход из системы');
   }
 
   @Operation('Обновить токен')
@@ -110,5 +110,16 @@ export class AuthController {
     return new GenericResponse('Вы успешно авторизовались', {
       user,
     });
+  }
+
+  @Operation('Получить профиль текущего пользователя')
+  @OkResponse(UserEntity)
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  async getProfile(
+    @GetUser() { id }: Pick<UserEntity, 'id'>,
+  ): Promise<GenericResponse<UserEntity>> {
+    const user = await this.authService.getProfile(id);
+    return new GenericResponse('Профиль успешно найден', user);
   }
 }

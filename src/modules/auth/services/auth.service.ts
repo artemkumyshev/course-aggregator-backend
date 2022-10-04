@@ -62,6 +62,17 @@ export class AuthService {
     return user;
   }
 
+  async signOut(id: string): Promise<void> {
+    const user = await this.userService.findUserById(id);
+    user.currentHashedRefreshToken = null;
+    await this.userRepository.save(user);
+    return;
+  }
+
+  async getProfile(id: string): Promise<UserEntity> {
+    return await this.userService.findUserById(id);
+  }
+
   async vaildateUser(email: string, plainTextPassword: string): Promise<any> {
     try {
       const user = await this.userService.findUserByEmail(email);

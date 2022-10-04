@@ -1,12 +1,9 @@
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ClassSerializerInterceptor, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import dbConfiguration from './shared/config/db.config';
-import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
-import { GlobalExceptionFilter } from './shared/filters/global-exception.filter';
-import { DatabaseExceptionFilter } from './shared/filters/database-exception.filter';
 import { RequestInterceptor } from './shared/interceptors/request.interceptor';
 
 import { AuthModule } from './modules/auth/auth.module';
@@ -26,9 +23,6 @@ import { AuthModule } from './modules/auth/auth.module';
     AuthModule,
   ],
   providers: [
-    { provide: APP_FILTER, useClass: HttpExceptionFilter },
-    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
-    { provide: APP_FILTER, useClass: DatabaseExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: RequestInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ClassSerializerInterceptor },
   ],
